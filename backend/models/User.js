@@ -27,6 +27,10 @@ const UserSchema = new mongoose.Schema({
     accountType: {
         type: String,
     },
+    location:{
+        type:String,
+        required: true
+    },
     date: {
         type: Date,
         default: Date.now
@@ -34,6 +38,7 @@ const UserSchema = new mongoose.Schema({
     actions: {
         wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: "Event" }], //stores event id
         rsvp: [{ type: mongoose.Schema.Types.ObjectId, ref: "Event" }],
+        pastEvents:[{type: mongoose.Schema.Types.ObjectId, ref="Event"}]
     }
 })
 
