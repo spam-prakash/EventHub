@@ -1,14 +1,16 @@
 const connectToMongo=require('./db')
 const express=require('express')
 const app=express()
+const passport = require("passport");
+require("./middleware/passport"); // <-- this is important
 const userdb = require('./models/User')
-
 
 const port=process.env.PORT||8080
 
 connectToMongo()
 
 app.use(express.json())
+app.use(passport.initialize());
 
 // Available Routes
 app.use('/api/auth', require('./routes/auth'))

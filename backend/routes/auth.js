@@ -7,7 +7,9 @@ const jwt = require('jsonwebtoken')
 const fetchuser = require('../middleware/fetchuser')
 const otpGenerator = require('otp-generator')
 const crypto = require('crypto')
-const sendMail=require('./mailer')
+const passport=require('passport')
+const sendMail = require('./mailer')
+
 
 const otpStore = {}
 
@@ -48,7 +50,7 @@ router.post('/createuser', [
     body('email', 'Enter a valid Email').isEmail(),
     body('password', 'Enter a valid password').isLength({ min: 3 }),
     body('otp', 'Enter a valid OTP').isLength({ min: 6, max: 6 }),
-    body('phone','Enter a valid Phone number').isLength({min:10,max:10})
+    body('phone', 'Enter a valid Phone number').isLength({ min: 10, max: 10 })
 ], async (req, res) => {
     let success = false
     const errors = validationResult(req)
@@ -56,7 +58,7 @@ router.post('/createuser', [
         return res.status(400).json({ success, errors: errors.array() })
     }
 
-    const { username, name, email, password, accountType, otp ,phone} = req.body
+    const { username, name, email, password, accountType, otp, phone } = req.body
 
     // Verify OTP
     if (otpStore[email] !== String(otp)) {
@@ -80,7 +82,7 @@ router.post('/createuser', [
         const secPass = await bcrypt.hash(password, salt)
 
         user = await User.create({
-            username, name, email, password: secPass, accountType,phone
+            username, name, email, password: secPass, accountType, phone
         })
         const data = {
             user: {
@@ -91,10 +93,10 @@ router.post('/createuser', [
         success = true;
         res.json({ success, authToken })
 
-        const subject='Welcome to EventHub'
-        const text=`Hello ${user.name},\n\nThank you for signing up for EventHub. We are excited to have you on board!\n\nBest regards,\nThe EventHub Team`
+        const subject = 'Welcome to EventHub'
+        const text = `Hello ${user.name},\n\nThank you for signing up for EventHub. We are excited to have you on board!\n\nBest regards,\nThe EventHub Team`
         const html = `<p>Hello ${user.name},</p><p>Thank you for signing up for EventHub. We are excited to have you on board!</p><p>Best regards,<br>The EventHub Team</p>`
-        await sendMail(user.email,subject,text,html)
+        await sendMail(user.email, subject, text, html)
         // Clear OTP from store
         delete otpStore[email]
     } catch (error) {
@@ -157,5 +159,47 @@ router.post('/getuser', fetchuser, async (req, res) => {
         res.status(500).send('Internal Server Error')
     }
 })
+
+
+// Routes for google SignUp
+router.get(
+    "/google",
+    passport.authenticate("google", { scope: ["profile", "email"] })
+);
+
+// Google callback
+router.get(
+    "/google/callback",
+    passport.authenticate("google", { failureRedirect: "/login", session: false }),
+    async (req, res) => {
+        try {
+            // req.user is set by passport (from passport.js file)
+            const user = req.user;
+
+            // Send Welcome note yo new Users
+            if (user && user.isNewUser) {
+                const subject = 'Welcome to EventHub';
+                const text = `Hello ${user.name},\n\nThank you for signing up for EventHub. We are excited to have you on board!\n\nBest regards,\nThe EventHub Team`;
+                const html = `<p>Hello ${user.name},</p>
+                      <p>Thank you for signing up for EventHub. We are excited to have you on board!</p>
+                      <p>Best regards,<br>The EventHub Team</p>`;
+
+                await sendMail(user.email, subject, text, html);
+            }
+
+            // Generate JWT for logged-in user
+            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+                expiresIn: "1d",
+            });
+
+            res.json({ success: true, token, user });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ success: false, error: "Internal Server Error" });
+        }
+    }
+);
+
+
 
 module.exports = router
